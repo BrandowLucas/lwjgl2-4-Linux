@@ -44,6 +44,8 @@ import org.lwjgl.input.Mouse;
 
 final class LinuxMouse {
 	private static final int POINTER_WARP_BORDER = 10;
+	private static final boolean INPUT_DEBUG = Boolean.getBoolean("org.lwjgl.opengl.LinuxInputDebug");
+	private static final int MOTION_DEBUG_LIMIT = 80;
 	// scale the mouse wheel according to DirectInput
 	private static final int WHEEL_SCALE = 120;
 
@@ -79,6 +81,7 @@ final class LinuxMouse {
 	private byte[] buttons;
 	private EventQueue event_queue;
 	private long last_event_nanos;
+	private int motion_debug_count;
 
 	LinuxMouse(long display, long window, long input_window) throws LWJGLException {
 		this.display = display;
@@ -102,6 +105,8 @@ final class LinuxMouse {
 		// Pretend that the cursor never moved
 		last_x = win_x;
 		last_y = transformY(win_y);
+		if (INPUT_DEBUG)
+			System.err.println("LWJGL_INPUT_DEBUG LinuxMouse.reset | grab=" + grab + " warpPointer=" + warp_pointer + " rootX=" + root_x + " rootY=" + root_y + " winX=" + win_x + " winY=" + win_y + " lastX=" + last_x + " lastY=" + last_y + " windowWidth=" + nGetWindowWidth(display, window) + " windowHeight=" + nGetWindowHeight(display, window));
 		doHandlePointerMotion(grab, warp_pointer, root_window, root_x, root_y, win_x, win_y, last_event_nanos);
 	}
 
@@ -149,6 +154,8 @@ final class LinuxMouse {
 	}
 
 	private void doWarpPointer(int center_x, int center_y) {
+		if (INPUT_DEBUG)
+			System.err.println("LWJGL_INPUT_DEBUG LinuxMouse.warp | x=" + center_x + " y=" + center_y + " windowWidth=" + nGetWindowWidth(display, window) + " windowHeight=" + nGetWindowHeight(display, window));
 		nSendWarpEvent(display, input_window, warp_atom, center_x, center_y);
 		nWarpCursor(display, window, center_x, center_y);
 	}
@@ -176,6 +183,10 @@ final class LinuxMouse {
 		// determine whether the cursor is outside the bounds
 		boolean outside_limits = root_x < border_left + POINTER_WARP_BORDER || root_y < border_top + POINTER_WARP_BORDER ||
 			root_x > border_right - POINTER_WARP_BORDER || root_y > border_bottom - POINTER_WARP_BORDER;
+		if (INPUT_DEBUG && (motion_debug_count < MOTION_DEBUG_LIMIT || outside_limits)) {
+			System.err.println("LWJGL_INPUT_DEBUG LinuxMouse.motion | grab=" + grab + " warpPointer=" + warp_pointer + " rootX=" + root_x + " rootY=" + root_y + " winX=" + win_x + " winY=" + win_y + " lastX=" + last_x + " lastY=" + last_y + " rootWidth=" + root_window_width + " rootHeight=" + root_window_height + " windowWidth=" + window_width + " windowHeight=" + window_height + " winLeft=" + win_left + " winTop=" + win_top + " borderLeft=" + border_left + " borderRight=" + border_right + " outside=" + outside_limits);
+			motion_debug_count++;
+		}
 		if (outside_limits) {
 			// Find the center of the limits in window coordinates
 			int center_x = (border_right - border_left)/2;
@@ -185,6 +196,8 @@ final class LinuxMouse {
 	}
 
 	public void changeGrabbed(boolean grab, boolean warp_pointer) {
+		if (INPUT_DEBUG)
+			System.err.println("LWJGL_INPUT_DEBUG LinuxMouse.changeGrabbed | grab=" + grab + " warpPointer=" + warp_pointer);
 		reset(grab, warp_pointer);
 	}
 
@@ -203,7 +216,11 @@ final class LinuxMouse {
 	private static native long nQueryPointer(long display, long window, IntBuffer result);
 
 	public void setCursorPosition(int x, int y) {
-		nWarpCursor(display, window, x, transformY(y));
+		int native_y = transformY(y);
+		if (INPUT_DEBUG)
+			System.err.println("LWJGL_INPUT_DEBUG LinuxMouse.setCursorPosition | x=" + x + " y=" + y + " nativeY=" + native_y);
+		doWarpPointer(x, native_y);
+		resetCursor(x, native_y);
 	}
 	private static native void nWarpCursor(long display, long window, int x, int y);
 

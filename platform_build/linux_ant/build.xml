@@ -4,9 +4,9 @@
 	<property name="native" location="../../src/native"/>
 	<property name="libname32" value="liblwjgl.so"/>
 	<property name="libname64" value="liblwjgl64.so"/>
-	<!-- After JDK 8 (at least on JDK 11), the architecture isn't part of the lib folder anymore -->
-	<property name="libs32" value="-L/usr/X11R6/lib -L/usr/X11/lib -lm -lX11 -lXext -lXcursor -lXrandr -lXxf86vm -lpthread -L${java.home}/lib -ljawt" />
-	<property name="libs64" value="-L/usr/X11R6/lib64 -L/usr/X11/lib64 -lm -lX11 -lXext -lXcursor -lXrandr -lXxf86vm -lpthread -L${java.home}/lib -ljawt" />
+	<!-- JDK 8 keeps libjawt in architecture-specific directories; newer JDKs keep it directly under lib. -->
+	<property name="libs32" value="-L/usr/X11R6/lib -L/usr/X11/lib -lm -lX11 -lXext -lXcursor -lXrandr -lXxf86vm -lpthread -L${java.home}/lib -L${java.home}/lib/i386 -L${java.home}/../lib/i386 -ljawt" />
+	<property name="libs64" value="-L/usr/X11R6/lib64 -L/usr/X11/lib64 -lm -lX11 -lXext -lXcursor -lXrandr -lXxf86vm -lpthread -L${java.home}/lib -L${java.home}/lib/amd64 -L${java.home}/../lib/amd64 -ljawt" />
 	<property name="cflags32" value="-O2 -Wall -c -fPIC -std=c99 -Wunused"/>
 
 	<target name="clean">

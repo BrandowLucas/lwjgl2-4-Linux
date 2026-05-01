@@ -150,6 +150,7 @@ public class Mouse {
 								LWJGLUtil.getPlatform() == LWJGLUtil.PLATFORM_MACOSX;
 
 	private static  boolean clipMouseCoordinatesToWindow = !getPrivilegedBoolean("org.lwjgl.input.Mouse.allowNegativeMouseCoords");
+	private static final boolean linuxInputDebug = Boolean.getBoolean("org.lwjgl.opengl.LinuxInputDebug");
 
 	/**
 	 * Mouse cannot be constructed.
@@ -280,7 +281,10 @@ public class Mouse {
 			setNativeCursor(currentCursor);
 		readBuffer = ByteBuffer.allocate(EVENT_SIZE * BUFFER_SIZE);
 		readBuffer.limit(0);
-		setGrabbed(isGrabbed);
+		boolean shouldGrab = isGrabbed;
+		if (linuxInputDebug)
+			System.err.println("LWJGL_INPUT_DEBUG Mouse.create restoreGrab | shouldGrab=" + shouldGrab);
+		setGrabbed(shouldGrab);
 	}
 
 	/**
@@ -647,6 +651,8 @@ public class Mouse {
 	public static void setGrabbed(boolean grab) {
 		synchronized (OpenGLPackageAccess.global_lock) {
 			boolean grabbed = isGrabbed;
+			if (linuxInputDebug)
+				System.err.println("LWJGL_INPUT_DEBUG Mouse.setGrabbed enter | requested=" + grab + " previous=" + grabbed + " created=" + isCreated());
 			isGrabbed = grab;
 			if (isCreated()) {
 				if (grab && !grabbed) {
@@ -661,6 +667,8 @@ public class Mouse {
 				}
 
 				implementation.grabMouse(grab);
+				if (linuxInputDebug)
+					System.err.println("LWJGL_INPUT_DEBUG Mouse.setGrabbed nativeDone | requested=" + grab + " previous=" + grabbed);
 				// Get latest values from native side
 				poll();
 				event_x = x;

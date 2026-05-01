@@ -78,7 +78,7 @@ JNIEXPORT jint JNICALL Java_org_lwjgl_opengl_LinuxKeyboard_lookupModifierMap(JNI
 
 JNIEXPORT jlong JNICALL Java_org_lwjgl_opengl_LinuxKeyboard_keycodeToKeySym(JNIEnv *env, jclass unused, jlong display_ptr, jint key_code) {
 	Display *disp = (Display *)(intptr_t)display_ptr;
-	KeySym key_sym = XKeycodeToKeysym(disp, key_code, 0);
+	KeySym key_sym = XkbKeycodeToKeysym(disp, key_code, 0, 0);
 	return key_sym;
 }
 

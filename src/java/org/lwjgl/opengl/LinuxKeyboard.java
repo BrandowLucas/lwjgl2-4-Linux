@@ -260,16 +260,18 @@ final class LinuxKeyboard {
 	private int getKeycode(long event_ptr, int event_state) {
 		boolean shift = (event_state & (ShiftMask | shift_lock_mask)) != 0;
 		int group = (event_state & modeswitch_mask) != 0 ? 1 : 0;
+		long base_keysym = getKeySym(event_ptr, group, 0);
 		long keysym;
 		if ((event_state & numlock_mask) != 0 && isKeypadKeysym(keysym = getKeySym(event_ptr, group, 1))) {
 			if ( shift )
-				keysym = getKeySym(event_ptr, group, 0);
+				keysym = base_keysym;
 		} else {
-			keysym = getKeySym(event_ptr, group, 0);
-			if ( shift ^ ((event_state & caps_lock_mask) != 0) )
-				keysym = toUpper(keysym);
+			keysym = base_keysym;
 		}
-		return LinuxKeycodes.mapKeySymToLWJGLKeyCode(keysym);
+		int keycode = LinuxKeycodes.mapKeySymToLWJGLKeyCode(keysym);
+		if (keycode == Keyboard.KEY_NONE && (shift ^ ((event_state & caps_lock_mask) != 0)))
+			keycode = LinuxKeycodes.mapKeySymToLWJGLKeyCode(toUpper(base_keysym));
+		return keycode;
 	}
 
 	private static byte getKeyState(int event_type) {

@@ -19,6 +19,14 @@ Compilation
 
 LWJGL requires a JDK and Ant installed to compile, as well as your platforms native compiler to compile the JNI.
 
-* ant generate-all
-* ant compile
-* ant compile_native
+Run both build targets when changing LWJGL:
+
+* `ant jars` - regenerates sources, compiles Java classes, and updates `libs/lwjgl.jar` and utility jars.
+* `ant compile_native` - compiles the platform JNI library and updates `libs/linux/liblwjgl64.so` on 64-bit Linux.
+
+For a clean local release build:
+
+```sh
+ant jars
+ant compile_native
+```

@@ -93,6 +93,7 @@ final class LinuxDisplay implements DisplayImplementation {
 	private static final int FULLSCREEN_LEGACY = 1;
 	private static final int FULLSCREEN_NETWM = 2;
 	private static final int WINDOWED = 3;
+	private static final boolean INPUT_DEBUG = Boolean.getBoolean("org.lwjgl.opengl.LinuxInputDebug");
 
 	/** Current window mode */
 	private static int current_window_mode = WINDOWED;
@@ -392,6 +393,8 @@ final class LinuxDisplay implements DisplayImplementation {
 	private void grabPointer() {
 		if (!pointer_grabbed) {
 			int result = nGrabPointer(getDisplay(), getWindow(), None);
+			if (INPUT_DEBUG)
+				System.err.println("LWJGL_INPUT_DEBUG LinuxDisplay.grabPointer | result=" + result + " windowMode=" + current_window_mode + " shouldGrab=" + shouldGrab() + " window=" + getWindow());
 			if (result == GrabSuccess) {
 				pointer_grabbed = true;
 				// make sure we have a centered window
@@ -406,6 +409,8 @@ final class LinuxDisplay implements DisplayImplementation {
 
 	private void ungrabPointer() {
 		if (pointer_grabbed) {
+			if (INPUT_DEBUG)
+				System.err.println("LWJGL_INPUT_DEBUG LinuxDisplay.ungrabPointer | windowMode=" + current_window_mode + " shouldGrab=" + shouldGrab() + " window=" + getWindow());
 			pointer_grabbed = false;
 			nUngrabPointer(getDisplay());
 		}
@@ -421,12 +426,28 @@ final class LinuxDisplay implements DisplayImplementation {
 	}
 
 	private void updatePointerGrab() {
+		if (INPUT_DEBUG)
+			System.err.println("LWJGL_INPUT_DEBUG LinuxDisplay.updatePointerGrab | fullscreen=" + isFullscreen() + " shouldGrab=" + shouldGrab() + " pointerGrabbed=" + pointer_grabbed + " inputReleased=" + input_released + " grab=" + grab + " mouse=" + (mouse != null));
 		if (isFullscreen() || shouldGrab()) {
 			grabPointer();
 		} else {
 			ungrabPointer();
 		}
 		updateCursor();
+	}
+
+	private void retryPointerGrab() {
+		if (pointer_grabbed || (!isFullscreen() && !shouldGrab()))
+			return;
+
+		boolean was_mouse_grabbed = shouldGrab();
+		grabPointer();
+		if (!pointer_grabbed)
+			return;
+
+		updateCursor();
+		if (was_mouse_grabbed && mouse != null)
+			mouse.changeGrabbed(grab, shouldWarpPointer());
 	}
 
 	private void updateCursor() {
@@ -897,6 +918,8 @@ final class LinuxDisplay implements DisplayImplementation {
 					window_y = y;
 					
 					if (window_width != width || window_height != height) {
+						if (INPUT_DEBUG)
+							System.err.println("LWJGL_INPUT_DEBUG LinuxDisplay.configure | oldWidth=" + window_width + " oldHeight=" + window_height + " newWidth=" + width + " newHeight=" + height + " x=" + x + " y=" + y + " pointerGrabbed=" + pointer_grabbed + " shouldGrab=" + shouldGrab());
 						resized = true;
 						window_width = width;
 						window_height = height;
@@ -919,6 +942,7 @@ final class LinuxDisplay implements DisplayImplementation {
 		lockAWT();
 		try {
 			processEvents();
+			retryPointerGrab();
 			checkInput();
 		} finally {
 			unlockAWT();
@@ -1167,6 +1191,8 @@ final class LinuxDisplay implements DisplayImplementation {
 	public void grabMouse(boolean new_grab) {
 		lockAWT();
 		try {
+			if (INPUT_DEBUG)
+				System.err.println("LWJGL_INPUT_DEBUG LinuxDisplay.grabMouse | requested=" + new_grab + " previous=" + grab + " pointerGrabbed=" + pointer_grabbed + " windowMode=" + current_window_mode);
 			if (new_grab != grab) {
 				grab = new_grab;
 				updateInputGrab();
