@@ -1178,6 +1178,7 @@ final class LinuxDisplay implements DisplayImplementation {
 			return;
 		input_released = false;
 		updateInputGrab();
+		refreshMouseGrab();
 		if (current_window_mode == FULLSCREEN_NETWM) {
 			try {
 				switchDisplayModeOnTmpDisplay(current_mode);
@@ -1197,10 +1198,17 @@ final class LinuxDisplay implements DisplayImplementation {
 				grab = new_grab;
 				updateInputGrab();
 				mouse.changeGrabbed(grab, shouldWarpPointer());
+			} else {
+				refreshMouseGrab();
 			}
 		} finally {
 			unlockAWT();
 		}
+	}
+
+	private void refreshMouseGrab() {
+		if (mouse != null && shouldWarpPointer())
+			mouse.changeGrabbed(true, true);
 	}
 
 	private boolean shouldWarpPointer() {
