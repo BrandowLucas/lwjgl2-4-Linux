@@ -77,6 +77,8 @@ final class LinuxDisplay implements DisplayImplementation {
 	private static final int ButtonPressMask = 1 << 2;
 	private static final int ButtonReleaseMask = 1 << 3;
 
+	private static final int NotifyGrab = 1;
+	private static final int NotifyUngrab = 2;
 	private static final int NotifyAncestor = 0;
 	private static final int NotifyNonlinear = 3;
 	private static final int NotifyPointer = 5;
@@ -88,6 +90,7 @@ final class LinuxDisplay implements DisplayImplementation {
 	private static final int SaveSetUnmap = 1;
 	
 	private static final int X_SetInputFocus = 42;
+	private static final int IconicState = 3;
 
 	/** Window mode enum */
 	private static final int FULLSCREEN_LEGACY = 1;
@@ -119,6 +122,7 @@ final class LinuxDisplay implements DisplayImplementation {
 
 	/** Atom used for the pointer warp messages */
 	private long delete_atom;
+	private long wm_change_state_atom;
 
 	private PeerInfo peer_info;
 
@@ -137,6 +141,8 @@ final class LinuxDisplay implements DisplayImplementation {
 	private boolean grab;
 	private boolean focused;
 	private boolean minimized;
+	private boolean ignore_next_fullscreen_unmap;
+	private boolean ignore_next_grab_focus_out;
 	private boolean dirty;
 	private boolean close_requested;
 	private long current_cursor;
@@ -753,6 +759,7 @@ final class LinuxDisplay implements DisplayImplementation {
 			Compiz.init();
 
 			delete_atom = internAtom("WM_DELETE_WINDOW", false);
+			wm_change_state_atom = internAtom("WM_CHANGE_STATE", false);
 			current_displaymode_extension = getBestDisplayModeExtension();
 			if (current_displaymode_extension == NONE)
 				throw new LWJGLException("No display mode extension is available");
@@ -893,8 +900,7 @@ final class LinuxDisplay implements DisplayImplementation {
 					setFocused(false, event_buffer.getFocusDetail());
 					break;
 				case LinuxEvent.ClientMessage:
-					if ((event_buffer.getClientFormat() == 32) && (event_buffer.getClientData(0) == delete_atom))
-						close_requested = true;
+					handleClientMessage();
 					break;
 				case LinuxEvent.MapNotify:
 					dirty = true;
@@ -902,7 +908,7 @@ final class LinuxDisplay implements DisplayImplementation {
 					break;
 				case LinuxEvent.UnmapNotify:
 					dirty = true;
-					minimized = true;
+					handleUnmapNotify();
 					break;
 				case LinuxEvent.Expose:
 					dirty = true;
@@ -936,6 +942,41 @@ final class LinuxDisplay implements DisplayImplementation {
 					break;
 			}
 		}
+	}
+
+	private void handleClientMessage() {
+		if (event_buffer.getClientFormat() != 32)
+			return;
+		if (INPUT_DEBUG)
+			System.err.println("LWJGL_INPUT_DEBUG LinuxDisplay.clientMessage | type=" + event_buffer.getClientMessageType() + " data0=" + event_buffer.getClientData(0));
+		if (event_buffer.getClientData(0) == delete_atom) {
+			close_requested = true;
+			return;
+		}
+		if (!isFullscreen())
+			return;
+		if (event_buffer.getClientMessageType() != wm_change_state_atom)
+			return;
+		if (event_buffer.getClientData(0) != IconicState)
+			return;
+		ignore_next_fullscreen_unmap = true;
+		if (INPUT_DEBUG)
+			System.err.println("LWJGL_INPUT_DEBUG LinuxDisplay.ignoreChangeState | state=Iconic");
+	}
+
+	private void handleUnmapNotify() {
+		if (INPUT_DEBUG)
+			System.err.println("LWJGL_INPUT_DEBUG LinuxDisplay.unmap | fullscreen=" + isFullscreen() + " ignore=" + ignore_next_fullscreen_unmap);
+		if (!isFullscreen() || !ignore_next_fullscreen_unmap) {
+			ignore_next_fullscreen_unmap = false;
+			minimized = true;
+			return;
+		}
+		ignore_next_fullscreen_unmap = false;
+		if (INPUT_DEBUG)
+			System.err.println("LWJGL_INPUT_DEBUG LinuxDisplay.remapFullscreen | window=" + getWindow());
+		mapRaised(getDisplay(), getWindow());
+		minimized = false;
 	}
 
 	public void update() {
@@ -1130,6 +1171,24 @@ final class LinuxDisplay implements DisplayImplementation {
 	}
 
 	private void setFocused(boolean got_focus, int focus_detail) {
+		if (INPUT_DEBUG)
+			System.err.println("LWJGL_INPUT_DEBUG LinuxDisplay.focus | got=" + got_focus + " mode=" + event_buffer.getFocusMode() + " detail=" + focus_detail);
+		int focus_mode = event_buffer.getFocusMode();
+		if (focus_mode == NotifyGrab || focus_mode == NotifyUngrab) {
+			ignore_next_grab_focus_out = true;
+			if (INPUT_DEBUG)
+				System.err.println("LWJGL_INPUT_DEBUG LinuxDisplay.ignoreGrabFocus | got=" + got_focus + " mode=" + focus_mode + " detail=" + focus_detail);
+			return;
+		}
+		boolean should_ignore_grab_focus_out = !got_focus && ignore_next_grab_focus_out && grab &&
+			pointer_grabbed && focus_detail == NotifyNonlinear && isCurrentWindowFocused();
+		if (should_ignore_grab_focus_out) {
+			ignore_next_grab_focus_out = false;
+			if (INPUT_DEBUG)
+				System.err.println("LWJGL_INPUT_DEBUG LinuxDisplay.ignoreGrabFocusOut | detail=" + focus_detail);
+			return;
+		}
+		ignore_next_grab_focus_out = false;
 		if (focused == got_focus || focus_detail == NotifyDetailNone || focus_detail == NotifyPointer || focus_detail == NotifyPointerRoot || xembedded)
 			return;
 		focused = got_focus;
@@ -1142,6 +1201,15 @@ final class LinuxDisplay implements DisplayImplementation {
 		}
 	}
 
+	private boolean isCurrentWindowFocused() {
+		try {
+			return nGetInputFocus(getDisplay()) == getWindow();
+		} catch (LWJGLException e) {
+			LWJGLUtil.log("Failed to query input focus: " + e.getMessage());
+			return true;
+		}
+	}
+
 	private void releaseInput() {
 		if (isLegacyFullscreen() || input_released)
 			return;
@@ -1150,7 +1218,8 @@ final class LinuxDisplay implements DisplayImplementation {
 		input_released = true;
 		updateInputGrab();
 		if (current_window_mode == FULLSCREEN_NETWM) {
-			nIconifyWindow(getDisplay(), getWindow(), getDefaultScreen());
+			if (INPUT_DEBUG)
+				System.err.println("LWJGL_INPUT_DEBUG LinuxDisplay.skipNetWMIconify");
 			try {
 				if( current_displaymode_extension == XRANDR )
 				{
