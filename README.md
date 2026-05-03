@@ -30,3 +30,16 @@ For a clean local release build:
 ant jars
 ant compile_native
 ```
+
+Usage
+-----
+
+Grab the client or Minecraft command line you already use and change it to point to this build:
+
+* Point `-Dorg.lwjgl.librarypath` / `-Djava.library.path` at the extracted [natives](https://github.com/BrandowLucas/lwjgl2-4-Linux/releases/download/2.9.6/natives-2.9.6.zip).
+* Change the classpath (`-cp`) so it uses this [LWJGL jar](https://github.com/BrandowLucas/lwjgl2-4-Linux/releases/download/2.9.6/lwjgl-2.9.6.jar).
+
+Lunar Client
+------------
+
+Apparently Lunar Client blocks loading our own LWJGL jar on its classpath, so there is a very hacky way to load it via patching the Lunar bake cache itself. If anyone is using this patched LWJGL and wants to use it on Lunar Client, open an issue in this repo.
