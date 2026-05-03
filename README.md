@@ -14,6 +14,21 @@ Website: [http://legacy.lwjgl.org](http://legacy.lwjgl.org)
 Forum: [http://forum.lwjgl.org](http://forum.lwjgl.org)
 Bugs/Suggestions: [https://github.com/LWJGL/lwjgl/issues](https://github.com/LWJGL/lwjgl/issues)
 
+Features
+--------
+
+Fixes:
+
+* Fix hotbar slots 2 and 6 not triggering while holding LSHIFT on Linux.
+* Fix native-resolution fullscreen limiting mouse aim to about 180 degrees until opening a GUI.
+* Fix XWayland cursor/aim jumps after fullscreening or alt-tabbing.
+* Fix random XWayland GUI cursor warps by preserving Minecraft-requested cursor positions.
+* Improve Linux mouse grab recovery after fullscreen/window recreation.
+
+Others:
+
+* Add optional Linux input debug logging for grab, warp, and motion state (`-Dorg.lwjgl.opengl.LinuxInputDebug=true`).
+  
 Compilation
 -----------
 
