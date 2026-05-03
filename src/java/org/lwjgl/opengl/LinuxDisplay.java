@@ -88,6 +88,7 @@ final class LinuxDisplay implements DisplayImplementation {
 	private static final int SaveSetUnmap = 1;
 	
 	private static final int X_SetInputFocus = 42;
+	private static final int IconicState = 3;
 
 	/** Window mode enum */
 	private static final int FULLSCREEN_LEGACY = 1;
@@ -119,6 +120,7 @@ final class LinuxDisplay implements DisplayImplementation {
 
 	/** Atom used for the pointer warp messages */
 	private long delete_atom;
+	private long wm_change_state_atom;
 
 	private PeerInfo peer_info;
 
@@ -753,6 +755,7 @@ final class LinuxDisplay implements DisplayImplementation {
 			Compiz.init();
 
 			delete_atom = internAtom("WM_DELETE_WINDOW", false);
+			wm_change_state_atom = internAtom("WM_CHANGE_STATE", false);
 			current_displaymode_extension = getBestDisplayModeExtension();
 			if (current_displaymode_extension == NONE)
 				throw new LWJGLException("No display mode extension is available");
@@ -893,8 +896,7 @@ final class LinuxDisplay implements DisplayImplementation {
 					setFocused(false, event_buffer.getFocusDetail());
 					break;
 				case LinuxEvent.ClientMessage:
-					if ((event_buffer.getClientFormat() == 32) && (event_buffer.getClientData(0) == delete_atom))
-						close_requested = true;
+					handleClientMessage();
 					break;
 				case LinuxEvent.MapNotify:
 					dirty = true;
@@ -902,7 +904,7 @@ final class LinuxDisplay implements DisplayImplementation {
 					break;
 				case LinuxEvent.UnmapNotify:
 					dirty = true;
-					minimized = true;
+					handleUnmapNotify();
 					break;
 				case LinuxEvent.Expose:
 					dirty = true;
@@ -936,6 +938,34 @@ final class LinuxDisplay implements DisplayImplementation {
 					break;
 			}
 		}
+	}
+
+	private void handleClientMessage() {
+		if (event_buffer.getClientFormat() != 32)
+			return;
+		if (event_buffer.getClientData(0) == delete_atom) {
+			close_requested = true;
+			return;
+		}
+		if (!isLegacyFullscreen())
+			return;
+		if (event_buffer.getClientMessageType() != wm_change_state_atom)
+			return;
+		if (event_buffer.getClientData(0) != IconicState)
+			return;
+		if (INPUT_DEBUG)
+			System.err.println("LWJGL_INPUT_DEBUG LinuxDisplay.ignoreChangeState | state=Iconic windowMode=" + current_window_mode + " window=" + getWindow());
+	}
+
+	private void handleUnmapNotify() {
+		if (!isLegacyFullscreen()) {
+			minimized = true;
+			return;
+		}
+		if (INPUT_DEBUG)
+			System.err.println("LWJGL_INPUT_DEBUG LinuxDisplay.remapLegacyFullscreen | window=" + getWindow());
+		mapRaised(getDisplay(), getWindow());
+		minimized = false;
 	}
 
 	public void update() {
